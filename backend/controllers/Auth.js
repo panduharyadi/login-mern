@@ -9,7 +9,7 @@ const Login = async(req, res) => {
     })
     if(!user) {
         return res.status(404).json({
-            msg: "User not found!"
+            msg: "Wrong Email!"
         })
     }
     const match = await argon2.verify(user.password, req.body.password)
