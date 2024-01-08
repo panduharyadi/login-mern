@@ -1,22 +1,173 @@
-const ProductModel = require('../models/ProductsModel')
+const Product = require('../models/ProductsModel');
+const Users = require('../models/UsersModel');
+const {Op} = require('sequelize')
 
-const getProducts = (req, res) => {
-
+const getProducts = async(req, res) => {
+    try {
+        let response;
+        if(req.role === "admin") {
+            response = await Product.findAll({
+                attributes: ['uuid', 'name', 'price'],
+                include: [{
+                    model: Users,
+                    attributes: ['name', 'email']
+                }]
+            })
+        } else {
+            response = await Product.findAll({
+                where: {
+                    userId: req.userId
+                },
+                include: [{
+                    model: Users
+                }]
+            })   
+        }
+        res.status(200).json(response)
+    } catch (error) {
+        res.status(500).json({ msg: error.message })
+    }
 }
 
-const getProductById = (req, res) => {
-    
+const getProductById = async(req, res) => {
+    try {
+        const product = await Product.findOne({
+            where: {
+                uuid: req.params.id
+            }
+        })
+        if(!product) {
+            return res.status(404).json({msg: "Product not found"})
+        }
+        let response;
+        if(req.role === "admin") {
+            response = await Product.findOne({
+                attributes: ['uuid', 'name', 'price'],
+                where: {
+                    id: product.id
+                },
+                include: [{
+                    model: Users,
+                    attributes: ['name', 'email']
+                }]
+            })
+        } else {
+            response = await Product.findOne({
+                attributes: ['uuid', 'name', 'price'],
+                where: {
+                    [Op.and]:[
+                        {
+                            id: product.id
+                        },
+                        {
+                            userId: req.userId
+                        }
+                    ]
+                },
+                include: [{
+                    model: Users,
+                    attributes: ['name', 'email']
+                }]
+            })   
+        }
+        res.status(200).json(response)
+    } catch (error) {
+        res.status(500).json({ msg: error.message })
+    }
 }
 
-const createProduct = (req, res) => {
-    
+const createProduct = async(req, res) => {
+    const { name, price } = req.body
+    try {
+        await Product.create({
+            name: name,
+            price: price,
+            userId: req.userId
+        });
+        res.status(201).json({ msg: "Product created successfully" })
+    } catch (error) {
+        res.status(500).json({msg: error.message})
+    }
 }
 
-function updateProduct(req, res) {
+const updateProduct = async(req, res) => {
+    try {
+        const product = await Product.findOne({
+            where: {
+                uuid: req.params.id
+            }
+        })
+        if(!product) {
+            return res.status(404).json({msg: "Product not found"})
+        }
+        const {name, price} = req.body
+        if(req.role === "admin") {
+            await Product.update({ name, price }, {
+                where: {
+                    id: product.id
+                }
+            })
+        } else {
+            if(req.params.id !== product.userId) {
+                return res.status(403).json({msg: "Accsess Denied!"})
+            }
+            await Product.update({ name, price }, {
+                where: {
+                    [Op.and]:[
+                        {
+                            id: product.id
+                        },
+                        {
+                            userId: req.userId
+                        }
+                    ]
+                }
+            })
+        }
+        res.status(200).json({ msg: "Product updated successfully" })
+    } catch (error) {
+        res.status(500).json({ msg: error.message })
+    }
 }
 
-const deleteProduct = (req, res) => {
-    
+const deleteProduct = async(req, res) => {
+    try {
+        const product = await Product.findOne({
+            where: {
+                uuid: req.params.id
+            }
+        })
+        if(!product) {
+            return res.status(404).json({msg: "Product not found"})
+        }
+        const {name, price} = req.body
+        if(req.role === "admin") {
+            await Product.destroy({
+                where: {
+                    id: product.id
+                }
+            })
+        } else {
+            if(req.params.id !== product.userId) {
+                return res.status(403).json({msg: "Accsess Denied!"})
+            }
+            await Product.destroy({
+                where: {
+                    [Op.and]:[
+                        {
+                            id: product.id
+                        },
+                        {
+                            userId: req.userId
+                        }
+                    ]
+                }
+            })
+        }
+        res.status(200).json({ msg: "Product deleted successfully" })
+    } catch (error) {
+        res.status(500).json({ msg: error.message })
+    }
 }
 
 module.exports = { getProducts, getProductById, createProduct, updateProduct, deleteProduct }
